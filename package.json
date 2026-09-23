@@ -1,0 +1,39 @@
+{
+  "name": "oxlint-plugin-anti-slop",
+  "version": "0.1.2",
+  "private": true,
+  "description": "Opinionated Oxlint rules that reject low-evidence TypeScript and JavaScript patterns.",
+  "author": "PaymentsWay",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PaymentsWayProjects/typescript-anti-slop.git"
+  },
+  "homepage": "https://github.com/PaymentsWayProjects/typescript-anti-slop#readme",
+  "bugs": {
+    "url": "https://github.com/PaymentsWayProjects/typescript-anti-slop/issues"
+  },
+  "type": "module",
+  "exports": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "check": "pnpm lint && pnpm test && pnpm typecheck && pnpm check:skill-assets",
+    "lint": "oxlint src",
+    "test": "tsx src/rules/require-readable-spacing.test.ts && tsx src/rules/require-readable-spacing-cli.test.ts && tsx src/rules/no-array-filter-map.test.ts && tsx src/rules/no-reduce-accumulator-copy.test.ts && tsx src/rules/no-chained-type-assertions.test.ts && tsx src/rules/no-conditional-empty-object-spread.test.ts && tsx src/rules/no-unsafe-dictionary-type.test.ts && tsx src/rules/no-known-value-widening.test.ts && tsx src/rules/no-object-parameters.test.ts && tsx src/rules/no-unknown-parameters.test.ts && tsx src/rules/no-runtime-typeof.test.ts && tsx src/rules/no-shape-in-symbol-names.test.ts && tsx src/rules/no-unknown-returns.test.ts && tsx src/rules/no-unknown-type-aliases.test.ts && tsx src/rules/no-widen-then-assert.test.ts && tsx src/rules/no-reflect-get.test.ts && tsx src/rules/no-reflect-apply.test.ts && tsx src/rules/no-module-mocking.test.ts && tsx src/rules/require-safety-comment-for-type-assertion.test.ts && tsx src/effect/rules/no-service-constructor-imports.test.ts && tsx src/effect/rules/no-manual-tag-comparison.test.ts && tsx src/effect/rules/no-manual-effect-error-tag.test.ts && tsx src/effect/rules/no-manual-tagged-construction.test.ts && tsx src/effect/rules/prefer-effect-match.test.ts",
+    "typecheck": "tsc --noEmit",
+    "sync:skill-assets": "node scripts/sync-skill-assets.mjs",
+    "check:skill-assets": "node scripts/sync-skill-assets.mjs --check"
+  },
+  "dependencies": {
+    "@oxlint/plugins": "1.78.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "oxlint": "1.78.0",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "license": "MIT"
+}
