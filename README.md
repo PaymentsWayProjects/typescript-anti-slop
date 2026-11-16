@@ -16,6 +16,8 @@ npx skills add PaymentsWayProjects/typescript-anti-slop --skill install-anti-slo
 
 Then ask your coding agent to install or configure anti-slop in the current repository. The skill copies the plugin, installs compatible Oxlint dependencies—matching an existing Oxlint version when present—merges the plugin into the existing lint configuration, enables every generic rule, and validates the result. In repositories that depend directly on Effect, it also enables the opt-in Effect rule group.
 
+For eligible Effect repositories, the skill also configures type-aware compiler diagnostics when the existing toolchain has a compatible `@effect/tsgo` release. It preserves lifecycle scripts and local diagnostics policy, and verifies accepted/rejected code through the configured lint command. See the [Effect diagnostics procedure](skills/install-anti-slop/references/effect-diagnostics.md) for compatibility checks, patch/wrapper setup, and the fresh-install severity defaults.
+
 ### Update an existing installation
 
 Ask your agent to **update anti-slop while preserving local customizations**, optionally naming an upstream revision or selected fixes. The same skill stages incoming source separately, uses a three-way merge when the original upstream snapshot is recoverable, and otherwise ports reviewed changes conservatively. It preserves local rules and configuration, asks about conflicting policy and enabling new rules, and records provenance for future updates. It does not force-replace the vendored directory.
@@ -27,6 +29,16 @@ To inspect available skills first:
 ```bash
 npx skills add PaymentsWayProjects/typescript-anti-slop --list
 ```
+
+## Effect program design skill
+
+```bash
+npx skills add PaymentsWayProjects/typescript-anti-slop --skill effect-program-design
+```
+
+Use this skill for Effect v4 application design, services and layers, schemas, errors, observability, resources, concurrency, persistence, platform integration, and tests. Its complete guidance lives in [the skill](skills/effect-program-design/SKILL.md) and 16 focused reference files.
+
+Effect guidance incorporates material credited to Kit Langton; see the [third-party attribution and license](skills/effect-program-design/ATTRIBUTION.md).
 
 ## Manual local installation
 
@@ -56,16 +68,19 @@ export default defineConfig({
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
   ],
   rules: {
+    "anti-slop/max-ternary-depth": ["error", { "maxDepth": 2 }],
     "oxc/no-accumulating-spread": "error",
     "anti-slop/no-array-filter-map": "error",
     "anti-slop/no-reduce-accumulator-copy": "error",
     "anti-slop/no-chained-type-assertions": "error",
-    "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-conditional-spread": "error",
+    "anti-slop/no-disabled-type-assertion-rules": "error",
     "anti-slop/no-known-value-widening": "error",
     "anti-slop/no-module-mocking": "error",
     "anti-slop/no-object-parameters": "error",
     "anti-slop/no-reflect-apply": "error",
     "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-reprovide-ambient-service": "error",
     "anti-slop/no-runtime-typeof": "error",
     "anti-slop/no-shape-in-symbol-names": "error",
     "anti-slop/no-unknown-parameters": "error",
@@ -98,25 +113,53 @@ export default defineConfig({
     "anti-slop-effect/no-manual-effect-error-tag": "error",
     "anti-slop-effect/no-manual-tag-comparison": "error",
     "anti-slop-effect/no-manual-tagged-construction": "error",
+    "anti-slop-effect/no-manual-tagged-type": "error",
+    "anti-slop-effect/no-ordie-in-service-construction": "error",
     "anti-slop-effect/no-service-constructor-imports": "error",
-    "anti-slop-effect/prefer-effect-match": "error"
+    "anti-slop-effect/no-service-parameters": "error",
+    "anti-slop-effect/no-test-code-in-src": "error",
+    "anti-slop-effect/prefer-effect-match": "error",
+    "anti-slop-effect/prefer-tagged-error-handling": "error",
+    "anti-slop-effect/prefer-yield-service": "error",
+    "anti-slop-effect/require-cause-when-narrowing": "error",
+    "anti-slop-effect/require-operation-span": "error",
+    "anti-slop-effect/require-service-make-layer": "error"
   }
 });
 ```
+
+## Additional rule families
+
+- [Martin Fowler smells](docs/martinfowler.md): eight deterministic rules in `martinfowler/index.ts`, plus semantic review questions. Register the AST plugin as `anti-slop-martinfowler`; use the guide's recommended warnings, leaving `message-chains` opt-in.
+- [Jev semantic review](docs/jev.md): Effect and Fowler question catalogs, plugins, and a changed-file runner. The ready-built fork lives in `vendor/oxlint-plugin-jev/`, with its license and pinned provenance. Normal dependency installation is sufficient; no submodule checkout or Jev build is required.
+- [Whole-diff review](docs/diff-rules.md): `diff-rules/run.ts` checks shotgun surgery, divergent change, duplicated code, and scope creep through a decision-model, LLM, or local command backend.
+
+AI checks remain opt-in and outside the default lint/check pipeline. They can transmit source code or Git history and incur model charges; explicitly approve the backend and provider before enabling them. The imported model-backed tests use loopback HTTP fixtures or local commands, not real model services.
+
+To vendor the real Jev package beside the rules:
+
+```bash
+node skills/install-anti-slop/scripts/install.mjs --jev
+```
+
+Then install the copied package through its local `file:` dependency and configure the plugins/overlay as described in the guides. The installer refuses existing destinations; use the update procedure to preserve local customizations.
 
 ## Rules
 
 ### Generic rules
 
+- `max-ternary-depth` — limits ternary expression chains to two levels by default; configure `maxDepth` to change the limit.
 - `no-array-filter-map` — rejects adjacent eager array filter/map passes while allowing lazy iterator pipelines.
 - `no-reduce-accumulator-copy` — rejects non-spread accumulator copies inside reducers; complements native `oxc/no-accumulating-spread`.
 - `no-chained-type-assertions` — rejects nested `as` and angle-bracket assertions that fabricate evidence; chains made only of `as const` remain valid.
-- `no-conditional-empty-object-spread` — reports object spreads that use a conditional `{}` branch to omit fields. It intentionally has no autofix because omission is not equivalent to assigning `undefined`.
+- `no-conditional-spread` — rejects ternary and logical expressions in object, array, call, and JSX spreads. It has no autofix because omission and evaluation semantics must be preserved explicitly.
+- `no-disabled-type-assertion-rules` — rejects inline disables of assertion-safety rules and blanket disable comments; justified exceptions belong in reviewed configuration overrides.
 - `no-known-value-widening` — rejects known expressions flowing into explicit `unknown`, `object`, anonymous-object, or open-dictionary targets, including known arguments passed to local `unknown` type predicates. Empty dictionary accumulators and finite-key `Record` targets remain valid.
 - `no-module-mocking` — rejects Vitest and Jest `mock`, `doMock`, and `unstable_mockModule` calls in favor of real dependency seams.
 - `no-object-parameters` — rejects `object`, unions containing it, and scoped or transparent generic aliases that resolve to it on function inputs.
 - `no-reflect-apply` — rejects global `Reflect.apply` in favor of typed function calls.
 - `no-reflect-get` — rejects global `Reflect.get` in favor of typed property access or boundary parsing.
+- `no-reprovide-ambient-service` — rejects yielding an Effect service only to provide that same value back into a nested operation.
 - `no-runtime-typeof` — requires boundary parsing instead of ad hoc `typeof` narrowing. Existence probes against the string `"undefined"` are allowed, and type predicates can be enabled explicitly.
 - `no-shape-in-symbol-names` — rejects the case-insensitive substring `shape` in locally owned symbol names while allowing static member names such as Zod's `schema.shape` that cannot be renamed locally.
 - `no-unknown-parameters` — rejects `unknown` and unions containing it on function inputs except the explicit `cause` convention and the exact subject of a type predicate.
@@ -127,13 +170,24 @@ export default defineConfig({
 - `require-readable-spacing` — autofixes missing blank lines between top-level declarations, around multiline bindings, before control flow/returns, and after blocks; preserves compact local bindings, imports, and overload groups.
 - `require-safety-comment-for-type-assertion` — requires each non-const assertion to have a nearby, non-empty invariant justification. Marker prefixes are configurable and default to `SAFETY`.
 
+Existing configurations must replace `anti-slop/no-conditional-empty-object-spread` with `anti-slop/no-conditional-spread`. The replacement also rejects logical expressions and spreads outside object literals; review the additional findings instead of treating the rename as behavior-neutral.
+
 ### Effect rules
 
 - `no-manual-effect-error-tag` — rejects manual `_tag` comparisons and switches inside broad `Effect.catch`, `Effect.catchAll`, and `Effect.catchIf` handlers in favor of tagged error handlers.
 - `no-manual-tag-comparison` — rejects direct `_tag` comparisons and `_tag` switches in favor of `Match`, `Predicate.isTagged`, or tagged-enum matching.
-- `no-manual-tagged-construction` — rejects literal `_tag` object construction in favor of Schema, tagged class/error, or `Data.taggedEnum` constructors. `Match.when` and `Match.not` patterns remain allowed.
+- `no-manual-tagged-construction` — rejects literal `_tag` object construction in favor of Schema, tagged class/error, or `Data.taggedEnum` constructors, including `_tag` object patterns passed to `Match.when` and `Match.not`, and literal `_tag` class fields.
+- `no-manual-tagged-type` — rejects `_tag` properties written by hand in `type`, `interface`, and inline type declarations, including generic constraints. Infer the type from a Schema or Data tagged constructor instead.
+- `no-ordie-in-service-construction` — rejects construction-time `Effect.orDie` and `Layer.orDie`, preserving typed construction failures.
 - `no-service-constructor-imports` — rejects named `make<CapabilityName>` imports from relative project modules outside `*.test.*` and `*.spec.*` files. Runtime callers should import the owning Layer and yield the contextual service instead. Package and path-alias imports, default imports, and static constructors such as `WorkspaceName.make` are outside the rule.
+- `no-service-parameters` — rejects Context, ManagedRuntime, Layer, and same-file service instances passed as function parameters.
+- `no-test-code-in-src` — rejects test files, test imports, and test-named exports in production source directories.
 - `prefer-effect-match` — rejects chained literal ternaries over the same value in favor of Effect's `Match` API.
+- `prefer-tagged-error-handling` — rejects `Predicate.isTagged` checks on errors in broad Effect catch handlers in favor of `Effect.catchTag`/`Effect.catchTags`, or `Effect.catchReason`/`Effect.catchReasons` for `error.reason`.
+- `prefer-yield-service` — rejects capturing an Effect context only to provide it back; yield the required services instead.
+- `require-cause-when-narrowing` — requires error-remapping handlers to preserve the original error as a cause or capture it before narrowing.
+- `require-operation-span` — requires operations returned by a service constructor to carry a named Effect span.
+- `require-service-make-layer` — requires contextual service classes to expose `make` and a layer derived from it, with tag-only classes allowed by default.
 
 ### Analysis boundaries
 
@@ -142,6 +196,12 @@ The rules use Oxlint's ESTree and lexical-scope APIs rather than a TypeScript ty
 ## Violation examples
 
 Each snippet below is rejected by the named rule.
+
+### `max-ternary-depth`
+
+```ts
+const value = first ? one : second ? two : third ? three : fallback;
+```
 
 ### `no-array-filter-map`
 
@@ -197,13 +257,28 @@ Enable native `oxc/no-accumulating-spread` alongside it for array/object spreads
 const user = input as object as User;
 ```
 
-### `no-conditional-empty-object-spread`
+### `no-conditional-spread`
 
 ```ts
 const options = {
   ...(timeout !== undefined ? { timeout } : {}),
 };
+const items = [...(ready ? pending : [])];
+send(...(args ?? []));
 ```
+
+### `no-reprovide-ambient-service`
+
+```ts
+import * as Effect from "effect/Effect";
+
+const operation = Effect.gen(function* () {
+  const service = yield* Service;
+  return yield* nested.pipe(Effect.provideService(Service, service));
+});
+```
+
+Leave the dependency in the nested operation's environment and provide its implementing Layer at runtime composition instead.
 
 ### `no-known-value-widening`
 
@@ -312,7 +387,15 @@ Literal tag objects are rejected by `no-manual-tagged-construction`:
 const result = { _tag: "Ready", value };
 ```
 
-Use the existing Schema, tagged class/error, or `Data.taggedEnum` constructor instead, such as `Ready.make({ value })`. Object patterns passed directly to `Match.when` and `Match.not` remain allowed.
+Use the existing Schema, tagged class/error, or `Data.taggedEnum` constructor instead, such as `Ready.make({ value })`. Object patterns with `_tag` passed to `Match.when` and `Match.not` are rejected too; use `Match.tag`/`Match.tags`.
+
+Manual tagged type declarations are rejected by `no-manual-tagged-type`:
+
+```ts
+type Ready = { readonly _tag: "Ready"; readonly value: string };
+```
+
+Infer the type from its tagged constructor instead, for example `export type Ready = typeof Ready.Type`.
 
 Manual tag branching in broad catch handlers is rejected by `no-manual-effect-error-tag`:
 
@@ -331,6 +414,18 @@ program.pipe(Effect.catchTag("NotFound", () => recover));
 ```
 
 For a tagged `error.reason`, use `Effect.catchReason` or `Effect.catchReasons`.
+
+`Predicate.isTagged` checks on the error in broad catch handlers are rejected by `prefer-tagged-error-handling`:
+
+```ts
+program.pipe(
+  Effect.catch((error) =>
+    Predicate.isTagged(error, "NotFound") ? recover : Effect.fail(error)
+  )
+);
+```
+
+Use `Effect.catchTag("NotFound", () => recover)` here as well.
 
 Repeated literal ternaries over the same value are rejected by `prefer-effect-match`:
 
@@ -433,7 +528,17 @@ pnpm install
 pnpm check
 ```
 
-`src/` is canonical. After changing production source, run `pnpm sync:skill-assets`; CI checks that the skill's bundled copy remains identical. `pnpm check` runs Oxlint, every RuleTester suite, TypeScript typechecking, and the skill-asset drift check.
+`src/` is canonical. After changing production source, run `pnpm sync:skill-assets`. CI checks that both asset bundles match their canonical sources. `pnpm check` runs Oxlint, rule and CLI tests, installer tests, TypeScript typechecking, and the skill-asset drift check.
+
+### Repository diagnostics
+
+`oxlint.config.ts` loads every `@effect/tsgo` preset and promotes its diagnostics to errors, except `missing-pipeable-signature`: this plugin does not require data-last overloads on exported functions. The CLI integration tests permit native Node imports to exercise the real filesystem and subprocess boundary. Third-party vendor source and generated skill assets are excluded from repository linting.
+
+The toolchain pins a compatible diagnostic generation rather than automatically adopting the newest Effect release. Newer presets introduce Effect collection/string migration policies; this native Oxlint plugin does not add an Effect runtime dependency merely to satisfy those preferences. Review new diagnostics before upgrading the pinned Oxlint/plugins, `@effect/tsgo`, and `oxlint-tsgolint` versions together.
+
+Dependency installation runs `prepare` to patch the local TypeScript, Oxlint, and tsgolint binaries. The existing frozen-lockfile CI install runs the same lifecycle hook. If installation scripts were disabled, run `pnpm prepare` before linting. Use a writable local installation; this pinned setup is not intended for shared or read-only package stores.
+
+Effect diagnostics are owned by Oxlint; the compiler plugin disables duplicate reporting. Typechecking includes the lint configuration and enables unchecked-index, exact-optional-property, override, and switch-fallthrough safety checks.
 
 ## License
 

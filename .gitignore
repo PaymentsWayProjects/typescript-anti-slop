@@ -2,3 +2,9 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# The pinned Jev distribution is source-controlled and shipped with the skill.
+!vendor/oxlint-plugin-jev/dist/
+!vendor/oxlint-plugin-jev/dist/**
+!skills/install-anti-slop/assets/oxlint-plugin-jev/dist/
+!skills/install-anti-slop/assets/oxlint-plugin-jev/dist/**
