@@ -7,11 +7,9 @@ new RuleTester().run(
 	noManualTaggedConstructionRule,
 	{
 		valid: [
-			'Match.when({ _tag: "Ready" }, handleReady);',
-			'Match.not({ "_tag": "Pending" });',
+			'Match.value(value).pipe(Match.tag("Ready", handleReady));',
 			"Ready.make({ value });",
 			"new NotFound({ id });",
-			"({ _tag: tag, value });",
 		],
 		invalid: [
 			{
@@ -21,6 +19,28 @@ new RuleTester().run(
 			{
 				code: 'const value = { ["_tag"]: "Ready" };',
 				errors: [{ messageId: "manualConstruction" }],
+			},
+			{
+				code: 'const value = { _tag: tag, payload };',
+				errors: [{ messageId: "manualConstruction" }],
+			},
+			{
+				filename: "value.ts",
+				code: 'const value = { _tag: "Ready" as const, payload };',
+				errors: [{ messageId: "manualConstruction" }],
+			},
+			{
+				code: 'Match.when({ _tag: "Ready" }, handleReady);',
+				errors: [{ messageId: "manualConstruction" }],
+			},
+			{
+				code: 'Match.not({ "_tag": "Pending" });',
+				errors: [{ messageId: "manualConstruction" }],
+			},
+			{
+				filename: "value.ts",
+				code: 'class Value { readonly _tag = "Ready"; }',
+				errors: [{ messageId: "manualDeclaration" }],
 			},
 		],
 	},

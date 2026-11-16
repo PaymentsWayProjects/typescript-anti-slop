@@ -4,10 +4,15 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "plugins": [{ "name": "@effect/language-service", "diagnostics": false }]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "oxlint.config.ts"]
 }
